@@ -12,10 +12,12 @@ FROM deps AS build
 RUN pnpm --filter @famfinance/api... build
 
 FROM node:20-bullseye AS runtime
-WORKDIR /app
+WORKDIR /repo/apps/api
 ENV NODE_ENV=production
-COPY --from=build /repo/apps/api/dist ./dist
-COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/apps/api/package.json ./package.json
+COPY --from=build /repo/node_modules /repo/node_modules
+COPY --from=build /repo/apps/api/node_modules /repo/apps/api/node_modules
+COPY --from=build /repo/packages /repo/packages
+COPY --from=build /repo/apps/api/dist /repo/apps/api/dist
+COPY --from=build /repo/apps/api/package.json /repo/apps/api/package.json
 EXPOSE 4000
 CMD ["node", "dist/main.js"]

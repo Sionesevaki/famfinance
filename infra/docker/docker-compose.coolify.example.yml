@@ -71,7 +71,7 @@ services:
       - "8080"
 
   migrate:
-    image: ghcr.io/<org-or-user>/famfinance-migrate:${TAG:-<tag>}
+    image: ghcr.io/sionesevaki/famfinance-migrate:${TAG}
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
     depends_on:
@@ -80,7 +80,7 @@ services:
     restart: "no"
 
   api:
-    image: ghcr.io/<org-or-user>/famfinance-api:${TAG:-<tag>}
+    image: ghcr.io/sionesevaki/famfinance-api:${TAG}
     environment:
       NODE_ENV: production
       PORT: "4000"
@@ -109,7 +109,7 @@ services:
       - "4000"
 
   worker:
-    image: ghcr.io/<org-or-user>/famfinance-worker:${TAG:-<tag>}
+    image: ghcr.io/sionesevaki/famfinance-worker:${TAG}
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
