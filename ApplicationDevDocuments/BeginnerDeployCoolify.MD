@@ -26,9 +26,11 @@ You said you don’t know your final domain until you deploy. That’s OK — yo
 
 This repo includes a manual workflow that builds and pushes 3 images:
 
-- `ghcr.io/<owner>/famfinance-api:<tag>`
-- `ghcr.io/<owner>/famfinance-worker:<tag>`
-- `ghcr.io/<owner>/famfinance-migrate:<tag>`
+- `ghcr.io/<owner-lowercase>/famfinance-api:<tag>`
+- `ghcr.io/<owner-lowercase>/famfinance-worker:<tag>`
+- `ghcr.io/<owner-lowercase>/famfinance-migrate:<tag>`
+
+Note: GHCR requires repository names to be lowercase.
 
 ### 1.1 Run the publish workflow
 
@@ -69,7 +71,7 @@ In Coolify:
 2. Add a **Resource** → **Docker Compose**
 3. Paste the contents of `infra/docker/docker-compose.coolify.example.yml`
 4. Replace `ghcr.io/<org-or-user>/...` with your GHCR path:
-   - usually `ghcr.io/<github-username-or-org>/famfinance-api:${TAG}`
+   - usually `ghcr.io/<github-username-or-org-lowercase>/famfinance-api:${TAG}`
    - same for `worker` and `migrate`
 
 ### 2.2 Add environment variables in Coolify
@@ -202,4 +204,3 @@ BASE_URL=https://api.yourdomain.com OWNER_TOKEN="..." ./scripts/smoke/api-smoke.
 
 - Email OAuth is still a placeholder (no real code exchange/refresh in production).
 - Rate limiting is in-memory (fine for single instance MVP, not for multi-replica HA).
-

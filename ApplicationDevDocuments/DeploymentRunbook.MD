@@ -41,7 +41,7 @@ Build both images with a tag:
 
 ```bash
 TAG=staging-$(date +%Y%m%d%H%M%S)
-IMAGE_PREFIX=ghcr.io/<org-or-user>/famfinance
+IMAGE_PREFIX=ghcr.io/<org-or-user-lowercase>/famfinance
 ./scripts/release/build-images.sh
 ```
 
