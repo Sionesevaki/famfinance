@@ -114,7 +114,9 @@ it("writes audit logs for admin job retry", async () => {
     .expect(200);
 
   expect(Array.isArray(failed.body)).toBe(true);
-  expect(failed.body.some((j: any) => j.jobId === job.id)).toBe(true);
+  expect(
+    (failed.body as Array<{ jobId: string | number | null }>).some((j) => String(j.jobId) === String(job.id)),
+  ).toBe(true);
 
   await request(app.getHttpServer())
     .post(`/admin/jobs/${job.id}/retry`)
@@ -131,4 +133,3 @@ it("writes audit logs for admin job retry", async () => {
 
   await queue.close();
 });
-

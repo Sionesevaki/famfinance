@@ -46,7 +46,7 @@ it("allows platform_admin to list workspaces/users", async () => {
     .expect(200);
 
   expect(Array.isArray(workspaces.body)).toBe(true);
-  expect(workspaces.body.some((w: any) => w.workspaceId === workspaceId)).toBe(true);
+  expect((workspaces.body as Array<{ workspaceId: string }>).some((w) => w.workspaceId === workspaceId)).toBe(true);
 
   const users = await request(app.getHttpServer())
     .get("/admin/users")
@@ -56,7 +56,7 @@ it("allows platform_admin to list workspaces/users", async () => {
     .expect(200);
 
   expect(Array.isArray(users.body)).toBe(true);
-  expect(users.body.some((u: any) => u.email === "user1@example.com")).toBe(true);
+  expect((users.body as Array<{ email: string }>).some((u) => u.email === "user1@example.com")).toBe(true);
 
   await request(app.getHttpServer())
     .get("/admin/metrics")

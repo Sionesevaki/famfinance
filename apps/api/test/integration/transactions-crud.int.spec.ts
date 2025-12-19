@@ -62,7 +62,7 @@ it("creates, edits, deletes transactions and supports merchants/categories listi
     .set("x-test-email", "user1@example.com")
     .expect(200);
 
-  expect(merchants.body.some((m: any) => m.name === "Albert Heijn")).toBe(true);
+  expect((merchants.body as Array<{ name: string }>).some((m) => m.name === "Albert Heijn")).toBe(true);
 
   const categories = await request(app.getHttpServer())
     .get(`/workspaces/${workspaceId}/categories`)
@@ -70,7 +70,7 @@ it("creates, edits, deletes transactions and supports merchants/categories listi
     .set("x-test-email", "user1@example.com")
     .expect(200);
 
-  expect(categories.body.some((c: any) => c.name === "Groceries")).toBe(true);
+  expect((categories.body as Array<{ name: string }>).some((c) => c.name === "Groceries")).toBe(true);
 
   const listFiltered = await request(app.getHttpServer())
     .get(`/workspaces/${workspaceId}/transactions`)
@@ -109,4 +109,3 @@ it("creates, edits, deletes transactions and supports merchants/categories listi
 
   expect(listAfterDelete.body.length).toBe(0);
 });
-
