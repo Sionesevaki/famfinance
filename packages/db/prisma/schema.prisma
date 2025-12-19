@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum ProviderType {
+  GMAIL
+  MICROSOFT
+  IMAP
+}
+
+enum DocumentType {
+  RECEIPT
+  INVOICE
+  STATEMENT
+  SUBSCRIPTION
+  OTHER
+}
+
+enum ExtractionStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+}
+
+enum TransactionSource {
+  EMAIL
+  UPLOAD
+  BANK
+  MANUAL
+}
+
+enum SubscriptionInterval {
+  WEEKLY
+  MONTHLY
+  YEARLY
+  UNKNOWN
+}
+
+model User {
+  id          String   @id @default(cuid())
+  keycloakSub String   @unique
+  email       String   @unique
+  fullName    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships           WorkspaceMember[]
+  invitesSent           WorkspaceInvite[]      @relation("InvitesSent")
+  uploads               Document[]             @relation("UploadedBy")
+  connectedEmailAccounts ConnectedEmailAccount[]
+  auditLogs             AuditLog[]             @relation("AuditActor")
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  currency  String   @default("EUR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  members               WorkspaceMember[]
+  invites               WorkspaceInvite[]
+  documents             Document[]
+  merchants             Merchant[]
+  categories            Category[]
+  txns                  Transaction[]
+  subs                  Subscription[]
+  connectedEmailAccounts ConnectedEmailAccount[]
+  emailMessages         EmailMessage[]
+  extractions           Extraction[]
+  rollups               AnalyticsMonthlyRollup[]
+  auditLogs             AuditLog[]
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  action String
+
+  actorUserId String?
+  actorEmail  String?
+
+  workspaceId String?
+
+  targetType String?
+  targetId   String?
+
+  requestId String?
+  ip        String?
+  userAgent String?
+
+  metadata Json?
+
+  actor     User?      @relation("AuditActor", fields: [actorUserId], references: [id])
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+model WorkspaceInvite {
+  id           String       @id @default(cuid())
+  workspaceId  String
+  invitedEmail String
+  role         WorkspaceRole @default(MEMBER)
+  tokenHash    String       @unique
+  status       InviteStatus @default(PENDING)
+  expiresAt    DateTime
+  createdAt    DateTime     @default(now())
+  acceptedAt   DateTime?
+  revokedAt    DateTime?
+
+  invitedById String
+  invitedBy   User      @relation("InvitesSent", fields: [invitedById], references: [id])
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@index([workspaceId])
+  @@index([invitedEmail])
+}
+
+model ConnectedEmailAccount {
+  id            String       @id @default(cuid())
+  workspaceId   String
+  userId        String
+  provider      ProviderType
+  providerEmail String
+  status        String       @default("CONNECTED")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  accessTokenEnc  String?
+  refreshTokenEnc String?
+  tokenExpiresAt  DateTime?
+
+  lastSyncAt    DateTime?
+  lastHistoryId String?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  emailMessages EmailMessage[]
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@unique([provider, providerEmail, workspaceId])
+}
+
+model EmailMessage {
+  id          String   @id @default(cuid())
+  workspaceId String
+  connectedId String
+  providerMsgId String
+  subject     String?
+  fromEmail   String?
+  sentAt      DateTime?
+  snippet     String?
+  createdAt   DateTime @default(now())
+  sha256      String?  @unique
+
+  connected ConnectedEmailAccount @relation(fields: [connectedId], references: [id])
+  workspace Workspace             @relation(fields: [workspaceId], references: [id])
+
+  documents Document[]
+
+  @@unique([connectedId, providerMsgId])
+  @@index([workspaceId])
+}
+
+model Document {
+  id             String       @id @default(cuid())
+  workspaceId    String
+  type           DocumentType @default(OTHER)
+  filename       String
+  mimeType       String
+  sizeBytes      Int
+  storageKey     String       @unique
+  checksumSha256 String?
+  uploadedAt     DateTime     @default(now())
+  deletedAt      DateTime?
+
+  uploadedById String?
+  uploadedBy   User?    @relation("UploadedBy", fields: [uploadedById], references: [id])
+
+  emailMessageId String?
+  emailMessage   EmailMessage? @relation(fields: [emailMessageId], references: [id])
+
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  extractions Extraction[]
+  txns        Transaction[]
+
+  @@index([workspaceId])
+  @@index([emailMessageId])
+}
+
+model Extraction {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  documentId   String
+  status       ExtractionStatus @default(PENDING)
+  engine       String           @default("pipeline-v1")
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  errorCode    String?
+  errorMessage String?
+
+  extractedText  String?
+  normalizedJson Json?
+
+  document  Document  @relation(fields: [documentId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  txns      Transaction[]
+
+  @@index([workspaceId, status])
+  @@unique([documentId, engine])
+}
+
+model Merchant {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  normalized  String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  txns      Transaction[]
+  subs      Subscription[]
+
+  @@unique([workspaceId, normalized])
+  @@index([workspaceId])
+}
+
+model Category {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  txns      Transaction[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+}
+
+model Transaction {
+  id          String            @id @default(cuid())
+  workspaceId String
+  source      TransactionSource @default(EMAIL)
+  occurredAt  DateTime
+  amountCents Int
+  currency    String            @default("EUR")
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  deletedAt   DateTime?
+
+  merchantId   String?
+  categoryId   String?
+  documentId   String?
+  extractionId String?
+  fingerprint  String?
+
+  workspace  Workspace  @relation(fields: [workspaceId], references: [id])
+  merchant   Merchant?  @relation(fields: [merchantId], references: [id])
+  category   Category?  @relation(fields: [categoryId], references: [id])
+  document   Document?  @relation(fields: [documentId], references: [id])
+  extraction Extraction? @relation(fields: [extractionId], references: [id])
+
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, merchantId])
+  @@index([workspaceId, categoryId])
+  @@unique([workspaceId, fingerprint])
+}
+
+model Subscription {
+  id            String               @id @default(cuid())
+  workspaceId   String
+  merchantId    String?
+  name          String
+  interval      SubscriptionInterval @default(UNKNOWN)
+  amountCents   Int?
+  currency      String               @default("EUR")
+  lastChargedAt DateTime?
+  nextDueAt     DateTime?
+  active        Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  merchant  Merchant? @relation(fields: [merchantId], references: [id])
+
+  @@index([workspaceId, active])
+}
+
+model AnalyticsMonthlyRollup {
+  id          String   @id @default(cuid())
+  workspaceId String
+  year        Int
+  month       Int
+  currency    String   @default("EUR")
+  totalCents  Int      @default(0)
+  byCategory  Json?
+  byMerchant  Json?
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, year, month, currency])
+  @@index([workspaceId, year, month])
+}

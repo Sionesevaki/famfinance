@@ -1,0 +1,50 @@
+{
+  "name": "@famfinance/api",
+  "private": true,
+  "version": "0.0.0",
+  "type": "commonjs",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.build.json --noEmit",
+    "start": "node dist/main.js",
+    "start:dev": "ts-node src/main.ts",
+    "lint": "eslint .",
+    "test": "pnpm --filter @famfinance/api... build && jest",
+    "test:unit": "pnpm --filter @famfinance/api... build && jest --selectProjects unit",
+    "test:integration": "pnpm --filter @famfinance/api... build && jest --selectProjects integration",
+    "test:e2e": "pnpm --filter @famfinance/api... build && jest --selectProjects e2e"
+  },
+  "dependencies": {
+    "@famfinance/db": "workspace:*",
+    "@famfinance/lib": "workspace:*",
+    "@nestjs/common": "^11.1.6",
+    "@nestjs/core": "^11.1.6",
+    "@nestjs/platform-express": "^11.1.6",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.2.0",
+    "@aws-sdk/client-s3": "^3.894.0",
+    "@aws-sdk/s3-request-presigner": "^3.894.0",
+    "bullmq": "^5.58.5",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.34.0",
+    "@nestjs/testing": "^11.1.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/express": "^4.17.23",
+    "@types/jest": "^29.5.14",
+    "@types/supertest": "^6.0.3",
+    "eslint": "^9.34.0",
+    "jest": "^29.7.0",
+    "supertest": "^7.1.4",
+    "testcontainers": "^10.5.0",
+    "ts-jest": "^29.4.4",
+    "ts-node": "^10.9.2",
+    "typescript-eslint": "^8.44.0",
+    "typescript": "^5.9.2"
+  }
+}

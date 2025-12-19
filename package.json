@@ -1,0 +1,22 @@
+{
+  "name": "famfinance",
+  "private": true,
+  "packageManager": "pnpm@9.12.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:up": "docker compose -f infra/docker/docker-compose.yml up -d --build",
+    "dev:down": "docker compose -f infra/docker/docker-compose.yml down -v",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "test:unit": "pnpm -r --if-present test:unit",
+    "test:integration": "pnpm -r --if-present test:integration",
+    "test:e2e": "pnpm -r --if-present test:e2e"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.11",
+    "turbo": "^2.5.6"
+  }
+}

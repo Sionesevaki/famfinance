@@ -1,0 +1,38 @@
+services:
+  migrate:
+    image: ghcr.io/<org-or-user>/famfinance-migrate:${TAG:-<tag>}
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    restart: "no"
+
+  api:
+    image: ghcr.io/<org-or-user>/famfinance-api:${TAG:-<tag>}
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
+      KEYCLOAK_JWKS_URI: ${KEYCLOAK_JWKS_URI}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      OAUTH_ALLOWED_REDIRECT_URIS: ${OAUTH_ALLOWED_REDIRECT_URIS}
+    ports:
+      - "4000:4000"
+
+  worker:
+    image: ghcr.io/<org-or-user>/famfinance-worker:${TAG:-<tag>}
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY}
