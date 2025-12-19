@@ -53,7 +53,7 @@ jobs:
           context: .
           file: apps/api/Dockerfile
           push: true
-          tags: ghcr.io/${{ toLower(env.IMAGE_OWNER) }}/famfinance-api:${{ inputs.tag }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/famfinance-api:${{ inputs.tag }}
 
       - name: Build and push Worker
         uses: docker/build-push-action@v6
@@ -61,7 +61,7 @@ jobs:
           context: .
           file: apps/worker/Dockerfile
           push: true
-          tags: ghcr.io/${{ toLower(env.IMAGE_OWNER) }}/famfinance-worker:${{ inputs.tag }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/famfinance-worker:${{ inputs.tag }}
 
       - name: Build and push Migrate
         uses: docker/build-push-action@v6
@@ -69,4 +69,4 @@ jobs:
           context: .
           file: packages/db/Dockerfile
           push: true
-          tags: ghcr.io/${{ toLower(env.IMAGE_OWNER) }}/famfinance-migrate:${{ inputs.tag }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/famfinance-migrate:${{ inputs.tag }}
