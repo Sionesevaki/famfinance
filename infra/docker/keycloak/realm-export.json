@@ -68,8 +68,13 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "enabled": true,
-      "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"],
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:3001/*",
+        "https://fafiy.com/*",
+        "https://www.fafiy.com/*"
+      ],
+      "webOrigins": ["http://localhost:3000", "http://localhost:3001", "https://fafiy.com", "https://www.fafiy.com"],
       "attributes": { "pkce.code.challenge.method": "S256" },
       "defaultClientScopes": ["profile", "email", "roles", "api-audience"]
     },
@@ -102,4 +107,3 @@
     }
   ]
 }
-

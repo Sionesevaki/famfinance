@@ -190,6 +190,14 @@ BASE_URL=https://api.yourdomain.com OWNER_TOKEN="..." ./scripts/smoke/api-smoke.
 - `KEYCLOAK_ISSUER` does not match token `iss`
 - Fix: update `KEYCLOAK_ISSUER` to the exact URL users authenticate against and redeploy.
 
+### `Token missing sub` from API
+
+- The API expects OIDC access tokens to include the standard `sub` claim.
+- If you see this error:
+  - Decode the access token payload and confirm it has `sub`.
+  - Ensure you are sending the access token (starts with `eyJ...`), not an opaque token.
+  - In Keycloak, avoid protocol mappers that overwrite/remove the `sub` claim.
+
 ### Presigned upload URL fails from browser
 
 - Your `S3_ENDPOINT` is not reachable from the browser.
