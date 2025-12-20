@@ -16,6 +16,7 @@ API (`apps/api`)
 - `REDIS_URL`
 - `S3_ENDPOINT` (omit for AWS; include for MinIO)
 - `S3_PRESIGN_ENDPOINT` (optional; if set, used for browser-facing presigned URLs)
+- `S3_ALLOW_SELF_SIGNED` (optional; set to `true` to allow self-signed TLS certs for S3 endpoints)
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`
 - `S3_BUCKET`

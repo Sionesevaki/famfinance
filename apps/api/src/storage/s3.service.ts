@@ -2,10 +2,23 @@ import { Injectable } from "@nestjs/common";
 import { S3Client, HeadBucketCommand, CreateBucketCommand, HeadObjectCommand, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { requireEnv } from "@famfinance/lib";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+import * as https from "node:https";
 
 @Injectable()
 export class S3Service {
   private readonly bucket = requireEnv("S3_BUCKET");
+  private readonly allowSelfSigned = process.env.S3_ALLOW_SELF_SIGNED === "true";
+
+  private handlerForEndpoint(endpoint?: string) {
+    const isHttps = (endpoint ?? "").trim().toLowerCase().startsWith("https://");
+    if (!isHttps || !this.allowSelfSigned) return undefined;
+    return new NodeHttpHandler({ httpsAgent: new https.Agent({ rejectUnauthorized: false }) });
+  }
+
+  private readonly internalHandler = this.handlerForEndpoint(process.env.S3_ENDPOINT);
+  private readonly presignHandler = this.handlerForEndpoint(process.env.S3_PRESIGN_ENDPOINT ?? process.env.S3_ENDPOINT);
+
   private readonly internalClient = new S3Client({
     region: process.env.S3_REGION ?? "us-east-1",
     endpoint: process.env.S3_ENDPOINT,
@@ -14,6 +27,7 @@ export class S3Service {
       accessKeyId: requireEnv("S3_ACCESS_KEY"),
       secretAccessKey: requireEnv("S3_SECRET_KEY"),
     },
+    ...(this.internalHandler ? { requestHandler: this.internalHandler } : {}),
   });
 
   // Use a public endpoint for presigned URLs so browsers can reach it.
@@ -28,6 +42,7 @@ export class S3Service {
       accessKeyId: requireEnv("S3_ACCESS_KEY"),
       secretAccessKey: requireEnv("S3_SECRET_KEY"),
     },
+    ...(this.presignHandler ? { requestHandler: this.presignHandler } : {}),
   });
 
   private bucketEnsured = false;

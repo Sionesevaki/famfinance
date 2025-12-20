@@ -1,6 +1,8 @@
 import { S3Client, GetObjectCommand, PutObjectCommand, HeadBucketCommand, CreateBucketCommand } from "@aws-sdk/client-s3";
 import { requireEnv } from "@famfinance/lib";
 import { Readable } from "node:stream";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+import * as https from "node:https";
 
 function streamToBuffer(stream: Readable): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -13,6 +15,13 @@ function streamToBuffer(stream: Readable): Promise<Buffer> {
 
 export class S3Storage {
   readonly bucket = requireEnv("S3_BUCKET");
+  private readonly allowSelfSigned = process.env.S3_ALLOW_SELF_SIGNED === "true";
+  private readonly endpoint = process.env.S3_ENDPOINT;
+  private readonly handler =
+    this.allowSelfSigned && (this.endpoint ?? "").trim().toLowerCase().startsWith("https://")
+      ? new NodeHttpHandler({ httpsAgent: new https.Agent({ rejectUnauthorized: false }) })
+      : undefined;
+
   readonly client = new S3Client({
     region: process.env.S3_REGION ?? "us-east-1",
     endpoint: process.env.S3_ENDPOINT,
@@ -21,6 +30,7 @@ export class S3Storage {
       accessKeyId: requireEnv("S3_ACCESS_KEY"),
       secretAccessKey: requireEnv("S3_SECRET_KEY"),
     },
+    ...(this.handler ? { requestHandler: this.handler } : {}),
   });
 
   private ensured = false;

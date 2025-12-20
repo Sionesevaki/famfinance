@@ -205,6 +205,11 @@ BASE_URL=https://api.yourdomain.com OWNER_TOKEN="..." ./scripts/smoke/api-smoke.
   - Recommended: keep `S3_ENDPOINT=http://minio:9000` (internal) and set `S3_PRESIGN_ENDPOINT` to your public MinIO domain (prefer `https://...`).
   - Alternatively: set `S3_ENDPOINT` itself to a public MinIO domain (works, but routes API/worker traffic through that hostname too).
 
+### `self-signed certificate` when calling S3/MinIO
+
+- Your `S3_ENDPOINT` (or `S3_PRESIGN_ENDPOINT`) is `https://...` but uses a self-signed TLS certificate.
+- Fix: use a proper TLS cert for MinIO (recommended), or temporarily set `S3_ALLOW_SELF_SIGNED=true` for `api` and `worker`.
+
 ### Keycloak realm didn’t import
 
 - Ensure `infra/docker/keycloak/realm-export.json` is present in the repo and the compose volume mount points to it.
