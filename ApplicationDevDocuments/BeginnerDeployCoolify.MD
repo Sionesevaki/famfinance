@@ -200,8 +200,10 @@ BASE_URL=https://api.yourdomain.com OWNER_TOKEN="..." ./scripts/smoke/api-smoke.
 
 ### Presigned upload URL fails from browser
 
-- Your `S3_ENDPOINT` is not reachable from the browser.
-- Fix: expose MinIO (port 9000) via Coolify with a domain, and set `S3_ENDPOINT` to that public URL (prefer `https://...`).
+- Your presigned S3 URL host is not reachable from the browser (common when `S3_ENDPOINT=http://minio:9000`).
+- Fix options:
+  - Recommended: keep `S3_ENDPOINT=http://minio:9000` (internal) and set `S3_PRESIGN_ENDPOINT` to your public MinIO domain (prefer `https://...`).
+  - Alternatively: set `S3_ENDPOINT` itself to a public MinIO domain (works, but routes API/worker traffic through that hostname too).
 
 ### Keycloak realm didn’t import
 

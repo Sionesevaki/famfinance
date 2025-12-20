@@ -15,6 +15,7 @@ API (`apps/api`)
 - `DATABASE_URL`
 - `REDIS_URL`
 - `S3_ENDPOINT` (omit for AWS; include for MinIO)
+- `S3_PRESIGN_ENDPOINT` (optional; if set, used for browser-facing presigned URLs)
 - `S3_ACCESS_KEY`
 - `S3_SECRET_KEY`
 - `S3_BUCKET`

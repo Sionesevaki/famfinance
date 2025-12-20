@@ -11,7 +11,11 @@ export class UsersService {
     const email =
       token.email ??
       (typeof token.preferred_username === "string" ? token.preferred_username : undefined);
-    if (!email) throw new BadRequestException("Token missing email");
+    if (!email) {
+      throw new BadRequestException(
+        "Token missing email (ensure Keycloak client includes the 'email' and 'profile' claims in access tokens)",
+      );
+    }
 
     const subject = token.sub;
     if (subject) {

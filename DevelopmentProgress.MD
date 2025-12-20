@@ -34,7 +34,7 @@ Phase 3 (Invites) progress
 
 Phase 4 (Documents) progress
 
-- Added S3/MinIO storage wrapper with bucket auto-create + presigned URLs: `apps/api/src/storage/s3.service.ts`.
+- Added S3/MinIO storage wrapper with bucket auto-create + presigned URLs (supports `S3_PRESIGN_ENDPOINT` for browser-reachable links): `apps/api/src/storage/s3.service.ts`.
 - Added documents endpoints:
   - `POST /workspaces/:workspaceId/documents/upload-url`
   - `POST /workspaces/:workspaceId/documents/:documentId/complete` (creates Extraction + enqueues `doc_extract`)
