@@ -86,8 +86,29 @@ export class S3Service {
     try {
       await this.internalClient.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
       return true;
-    } catch {
-      return false;
+    } catch (e: any) {
+      const httpStatus = e?.$metadata?.httpStatusCode;
+      const code = e?.Code || e?.code || e?.name;
+
+      // Some proxies mis-handle HEAD requests; fall back to a minimal ranged GET before concluding "missing".
+      if (httpStatus === 404 || code === "NotFound" || code === "NoSuchKey") {
+        try {
+          const res = await this.internalClient.send(
+            new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: "bytes=0-0" }),
+          );
+          const body: any = (res as any).Body;
+          if (body && typeof body.destroy === "function") body.destroy();
+          return true;
+        } catch (e2: any) {
+          const httpStatus2 = e2?.$metadata?.httpStatusCode;
+          const code2 = e2?.Code || e2?.code || e2?.name;
+          if (httpStatus2 === 404 || code2 === "NotFound" || code2 === "NoSuchKey") return false;
+          throw e2;
+        }
+      }
+
+      // Anything else is likely configuration/permissions.
+      throw e;
     }
   }
 }

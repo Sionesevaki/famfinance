@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException, type OnModuleDestro
 import { DocumentType } from "@famfinance/db";
 import { Queue } from "bullmq";
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 import { PrismaService } from "../../prisma/prisma.service";
 import { S3Service } from "../../storage/s3.service";
 import { requireEnv } from "@famfinance/lib";
@@ -67,8 +68,29 @@ export class DocumentsService implements OnModuleDestroy {
     });
     if (!doc) throw new NotFoundException("Document not found");
 
-    const exists = await this.s3.objectExists(doc.storageKey);
-    if (!exists) throw new BadRequestException("Uploaded object not found in storage");
+    let exists = false;
+    const retryDelaysMs = [0, 250, 750];
+    for (const d of retryDelaysMs) {
+      if (d) await delay(d);
+      try {
+        exists = await this.s3.objectExists(doc.storageKey);
+        if (exists) break;
+      } catch (e: any) {
+        const code = e?.Code || e?.code || e?.name || "UnknownError";
+        const httpStatus = e?.$metadata?.httpStatusCode;
+        const suffix = httpStatus ? ` (HTTP ${httpStatus})` : "";
+        throw new BadRequestException(
+          `Storage check failed: ${code}${suffix}. Ensure S3_ENDPOINT points to the same MinIO used for uploads and that S3 credentials allow HeadObject/GetObject.`,
+        );
+      }
+    }
+
+    if (!exists) {
+      const endpoint = process.env.S3_ENDPOINT || "(unset)";
+      throw new BadRequestException(
+        `Uploaded object not found in storage. Checked bucket=${requireEnv("S3_BUCKET")} key=${doc.storageKey} via S3_ENDPOINT=${endpoint}. This usually means the browser PUT did not persist, or your presigned URL points at a different MinIO than S3_ENDPOINT.`,
+      );
+    }
 
     const extraction = await this.prisma.extraction.upsert({
       where: { documentId_engine: { documentId: doc.id, engine: "pipeline-v1" } },

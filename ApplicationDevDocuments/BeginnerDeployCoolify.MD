@@ -205,10 +205,29 @@ BASE_URL=https://api.yourdomain.com OWNER_TOKEN="..." ./scripts/smoke/api-smoke.
   - Recommended: keep `S3_ENDPOINT=http://minio:9000` (internal) and set `S3_PRESIGN_ENDPOINT` to your public MinIO domain (prefer `https://...`).
   - Alternatively: set `S3_ENDPOINT` itself to a public MinIO domain (works, but routes API/worker traffic through that hostname too).
 
+### `Uploaded object not found in storage` after clicking upload
+
+- The API couldn’t `HEAD` the object after the browser uploaded it.
+- Common causes:
+  - The browser upload didn’t actually reach MinIO (CORS/DNS/TLS/proxy), even though the frontend proceeded.
+  - `S3_ENDPOINT` points to a different MinIO than the one used to generate the presigned URL (`S3_PRESIGN_ENDPOINT`).
+  - The MinIO user policy allows `PutObject` but not `HeadObject/GetObject` (server-side check fails).
+- Fix:
+  - Confirm the `uploadUrl` host matches your MinIO domain and that the object exists in the bucket.
+  - Ensure `S3_ENDPOINT` and `S3_PRESIGN_ENDPOINT` point to the same MinIO (or set only `S3_ENDPOINT`).
+  - Ensure the credentials have `s3:GetObject` permission (required for HEAD/GET).
+
 ### `self-signed certificate` when calling S3/MinIO
 
 - Your `S3_ENDPOINT` (or `S3_PRESIGN_ENDPOINT`) is `https://...` but uses a self-signed TLS certificate.
 - Fix: use a proper TLS cert for MinIO (recommended), or temporarily set `S3_ALLOW_SELF_SIGNED=true` for `api` and `worker`.
+
+### `InvalidAccessKeyId` when calling S3/MinIO
+
+- The `S3_ACCESS_KEY` / `S3_SECRET_KEY` configured for `api`/`worker` do not match the MinIO user you’re connecting to.
+- Fix:
+  - In MinIO, create/confirm an access key + secret key pair.
+  - Set `S3_ACCESS_KEY` + `S3_SECRET_KEY` in Coolify for the API and worker services and redeploy.
 
 ### Keycloak realm didn’t import
 
