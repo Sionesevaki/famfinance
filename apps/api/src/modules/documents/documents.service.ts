@@ -7,6 +7,22 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { S3Service } from "../../storage/s3.service";
 import { requireEnv } from "@famfinance/lib";
 
+function getAwsErrorInfo(err: unknown): { httpStatusCode?: number; code?: string } {
+  if (!err || typeof err !== "object") return {};
+  const anyErr = err as Record<string, unknown>;
+
+  let httpStatusCode: number | undefined;
+  const metadata = anyErr.$metadata;
+  if (metadata && typeof metadata === "object") {
+    const m = metadata as Record<string, unknown>;
+    if (typeof m.httpStatusCode === "number") httpStatusCode = m.httpStatusCode;
+  }
+  const codeRaw = anyErr.Code ?? anyErr.code ?? anyErr.name;
+  const code = typeof codeRaw === "string" ? codeRaw : undefined;
+
+  return { httpStatusCode, code };
+}
+
 type CreateUploadUrlParams = {
   workspaceId: string;
   uploadedById: string;
@@ -75,9 +91,9 @@ export class DocumentsService implements OnModuleDestroy {
       try {
         exists = await this.s3.objectExists(doc.storageKey);
         if (exists) break;
-      } catch (e: any) {
-        const code = e?.Code || e?.code || e?.name || "UnknownError";
-        const httpStatus = e?.$metadata?.httpStatusCode;
+      } catch (e: unknown) {
+        const { code: rawCode, httpStatusCode: httpStatus } = getAwsErrorInfo(e);
+        const code = rawCode || "UnknownError";
         const suffix = httpStatus ? ` (HTTP ${httpStatus})` : "";
         throw new BadRequestException(
           `Storage check failed: ${code}${suffix}. Ensure S3_ENDPOINT points to the same MinIO used for uploads and that S3 credentials allow HeadObject/GetObject.`,

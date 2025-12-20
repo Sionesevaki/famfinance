@@ -5,6 +5,28 @@ import { requireEnv } from "@famfinance/lib";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import * as https from "node:https";
 
+function getAwsErrorInfo(err: unknown): { httpStatusCode?: number; code?: string } {
+  if (!err || typeof err !== "object") return {};
+  const anyErr = err as Record<string, unknown>;
+
+  let httpStatusCode: number | undefined;
+  const metadata = anyErr.$metadata;
+  if (metadata && typeof metadata === "object") {
+    const m = metadata as Record<string, unknown>;
+    if (typeof m.httpStatusCode === "number") httpStatusCode = m.httpStatusCode;
+  }
+  const codeRaw = anyErr.Code ?? anyErr.code ?? anyErr.name;
+  const code = typeof codeRaw === "string" ? codeRaw : undefined;
+
+  return { httpStatusCode, code };
+}
+
+function destroyBodyIfPossible(body: unknown) {
+  if (!body || typeof body !== "object") return;
+  const maybe = body as { destroy?: () => void };
+  if (typeof maybe.destroy === "function") maybe.destroy();
+}
+
 @Injectable()
 export class S3Service {
   private readonly bucket = requireEnv("S3_BUCKET");
@@ -86,9 +108,8 @@ export class S3Service {
     try {
       await this.internalClient.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
       return true;
-    } catch (e: any) {
-      const httpStatus = e?.$metadata?.httpStatusCode;
-      const code = e?.Code || e?.code || e?.name;
+    } catch (e: unknown) {
+      const { httpStatusCode: httpStatus, code } = getAwsErrorInfo(e);
 
       // Some proxies mis-handle HEAD requests; fall back to a minimal ranged GET before concluding "missing".
       if (httpStatus === 404 || code === "NotFound" || code === "NoSuchKey") {
@@ -96,12 +117,10 @@ export class S3Service {
           const res = await this.internalClient.send(
             new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: "bytes=0-0" }),
           );
-          const body: any = (res as any).Body;
-          if (body && typeof body.destroy === "function") body.destroy();
+          destroyBodyIfPossible((res as { Body?: unknown }).Body);
           return true;
-        } catch (e2: any) {
-          const httpStatus2 = e2?.$metadata?.httpStatusCode;
-          const code2 = e2?.Code || e2?.code || e2?.name;
+        } catch (e2: unknown) {
+          const { httpStatusCode: httpStatus2, code: code2 } = getAwsErrorInfo(e2);
           if (httpStatus2 === 404 || code2 === "NotFound" || code2 === "NoSuchKey") return false;
           throw e2;
         }
