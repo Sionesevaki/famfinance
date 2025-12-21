@@ -9,6 +9,14 @@ export type TxUpsertJobPayload = {
   engine: string;
 };
 
+type NormalizedTxn = {
+  occurredAt: string;
+  amountCents: number;
+  currency?: string;
+  merchantName: string;
+  description?: string;
+};
+
 function normalizeMerchant(input: string): string {
   return input
     .toLowerCase()
@@ -20,6 +28,14 @@ function normalizeMerchant(input: string): string {
 
 function sha256Hex(input: string): string {
   return createHash("sha256").update(input).digest("hex");
+}
+
+function normalizeDescription(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 180);
 }
 
 export async function processTxUpsert(params: {
@@ -42,56 +58,96 @@ export async function processTxUpsert(params: {
     return { status: "skipped_not_normalized" };
   }
 
-  const norm = normalized as {
-    ok: true;
-    occurredAt: string;
-    amountCents: number;
-    currency?: string;
-    merchantName: string;
-  };
+  const txns: NormalizedTxn[] = (() => {
+    const obj = normalized as Record<string, unknown>;
+    const maybeTxns = obj.transactions;
+    if (Array.isArray(maybeTxns)) return maybeTxns as NormalizedTxn[];
 
-  const occurredAt = new Date(norm.occurredAt);
-  const amountCents = Number(norm.amountCents);
-  const currency = String(norm.currency || "EUR");
-  const merchantName = String(norm.merchantName);
+    // Backwards-compat: single-transaction shape
+    if ("occurredAt" in obj && "amountCents" in obj && "merchantName" in obj) {
+      return [
+        {
+          occurredAt: String(obj.occurredAt),
+          amountCents: Number(obj.amountCents),
+          currency: typeof obj.currency === "string" ? obj.currency : undefined,
+          merchantName: String(obj.merchantName),
+          description: typeof obj.description === "string" ? obj.description : undefined,
+        },
+      ];
+    }
 
-  if (!Number.isFinite(amountCents) || !merchantName) throw new Error("Invalid normalized payload");
+    return [];
+  })();
 
-  const merchantNormalized = normalizeMerchant(merchantName);
-  const merchant = await prisma.merchant.upsert({
-    where: { workspaceId_normalized: { workspaceId: payload.workspaceId, normalized: merchantNormalized } },
-    update: { name: merchantName },
-    create: { workspaceId: payload.workspaceId, name: merchantName, normalized: merchantNormalized },
+  if (txns.length === 0) return { status: "skipped_not_normalized" };
+
+  const rollupKeySet = new Set<string>();
+  let upsertedCount = 0;
+  for (const t of txns) {
+    const occurredAt = new Date(t.occurredAt);
+    const amountCents = Number(t.amountCents);
+    const currency = String(t.currency || "EUR");
+    const merchantName = String(t.merchantName || t.description || "").trim();
+    const description = String(t.description || t.merchantName || "").trim() || null;
+
+    if (Number.isNaN(occurredAt.getTime())) continue;
+    if (!Number.isFinite(amountCents)) continue;
+    if (!merchantName) continue;
+
+    const merchantNormalized = normalizeMerchant(merchantName);
+    const merchant = await prisma.merchant.upsert({
+      where: { workspaceId_normalized: { workspaceId: payload.workspaceId, normalized: merchantNormalized } },
+      update: { name: merchantName },
+      create: { workspaceId: payload.workspaceId, name: merchantName, normalized: merchantNormalized },
+    });
+
+    const fingerprint = sha256Hex(
+      [
+        payload.workspaceId,
+        occurredAt.toISOString(),
+        String(amountCents),
+        currency,
+        merchantNormalized,
+        description ? normalizeDescription(description) : "",
+      ].join("|"),
+    );
+
+    await prisma.transaction.upsert({
+      where: { workspaceId_fingerprint: { workspaceId: payload.workspaceId, fingerprint } },
+      update: {
+        merchantId: merchant.id,
+        documentId: payload.documentId,
+        extractionId: payload.extractionId,
+        description,
+        currency,
+        amountCents,
+        occurredAt,
+        deletedAt: null,
+      },
+      create: {
+        workspaceId: payload.workspaceId,
+        source: TransactionSource.UPLOAD,
+        occurredAt,
+        amountCents,
+        currency,
+        description,
+        merchantId: merchant.id,
+        documentId: payload.documentId,
+        extractionId: payload.extractionId,
+        fingerprint,
+      },
+    });
+
+    upsertedCount += 1;
+    const y = occurredAt.getUTCFullYear();
+    const m = occurredAt.getUTCMonth() + 1;
+    rollupKeySet.add(`${y}-${m}-${currency}`);
+  }
+
+  const rollups = [...rollupKeySet].map((k) => {
+    const [y, m, c] = k.split("-");
+    return { year: Number(y), month: Number(m), currency: String(c) };
   });
 
-  const day = occurredAt.toISOString().slice(0, 10);
-  const fingerprint = sha256Hex([payload.workspaceId, day, String(amountCents), merchantNormalized, currency].join("|"));
-
-  await prisma.transaction.upsert({
-    where: { workspaceId_fingerprint: { workspaceId: payload.workspaceId, fingerprint } },
-    update: {
-      merchantId: merchant.id,
-      documentId: payload.documentId,
-      extractionId: payload.extractionId,
-      description: merchantName,
-      currency,
-      amountCents,
-      occurredAt,
-      deletedAt: null,
-    },
-    create: {
-      workspaceId: payload.workspaceId,
-      source: TransactionSource.UPLOAD,
-      occurredAt,
-      amountCents,
-      currency,
-      description: merchantName,
-      merchantId: merchant.id,
-      documentId: payload.documentId,
-      extractionId: payload.extractionId,
-      fingerprint,
-    },
-  });
-
-  return { status: "upserted", year: occurredAt.getUTCFullYear(), month: occurredAt.getUTCMonth() + 1, currency };
+  return { status: "upserted", count: upsertedCount, rollups };
 }
