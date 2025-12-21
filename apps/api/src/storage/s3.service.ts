@@ -27,6 +27,28 @@ function destroyBodyIfPossible(body: unknown) {
   if (typeof maybe.destroy === "function") maybe.destroy();
 }
 
+function isNotFoundAwsError(err: unknown): boolean {
+  const { httpStatusCode, code } = getAwsErrorInfo(err);
+  return httpStatusCode === 404 || code === "NotFound" || code === "NoSuchKey";
+}
+
+function isLikelyHeadBlocked(err: unknown): boolean {
+  const { httpStatusCode, code } = getAwsErrorInfo(err);
+  return (
+    httpStatusCode === 404 ||
+    httpStatusCode === 403 ||
+    code === "NotFound" ||
+    code === "NoSuchKey" ||
+    code === "Forbidden" ||
+    code === "AccessDenied"
+  );
+}
+
+function isInvalidRange(err: unknown): boolean {
+  const { httpStatusCode, code } = getAwsErrorInfo(err);
+  return httpStatusCode === 416 || code === "InvalidRange";
+}
+
 @Injectable()
 export class S3Service {
   private readonly bucket = requireEnv("S3_BUCKET");
@@ -110,32 +132,30 @@ export class S3Service {
       await this.internalClient.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
       return true;
     } catch (e: unknown) {
-      const { httpStatusCode: httpStatus, code } = getAwsErrorInfo(e);
+      if (isNotFoundAwsError(e)) return false;
 
-      // Some proxies mis-handle HEAD requests (403/404). Fall back to a minimal ranged GET.
-      if (
-        httpStatus === 404 ||
-        httpStatus === 403 ||
-        code === "NotFound" ||
-        code === "NoSuchKey" ||
-        code === "Forbidden" ||
-        code === "AccessDenied"
-      ) {
+      // Some proxies (Cloudflare) mis-handle HEAD requests. Fall back to GET checks.
+      if (!isLikelyHeadBlocked(e)) throw e;
+
+      // First try a minimal ranged GET.
+      try {
+        const res = await this.internalClient.send(new GetObjectCommand({ Bucket: bucket, Key: key, Range: "bytes=0-0" }));
+        destroyBodyIfPossible((res as { Body?: unknown }).Body);
+        return true;
+      } catch (e2: unknown) {
+        if (isNotFoundAwsError(e2)) return false;
+        if (isInvalidRange(e2)) return true; // object exists but is empty / range rejected
+
+        // Some proxies block Range requests; try a normal GET but immediately close the body stream.
         try {
-          const res = await this.internalClient.send(
-            new GetObjectCommand({ Bucket: bucket, Key: key, Range: "bytes=0-0" }),
-          );
-          destroyBodyIfPossible((res as { Body?: unknown }).Body);
+          const res2 = await this.internalClient.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+          destroyBodyIfPossible((res2 as { Body?: unknown }).Body);
           return true;
-        } catch (e2: unknown) {
-          const { httpStatusCode: httpStatus2, code: code2 } = getAwsErrorInfo(e2);
-          if (httpStatus2 === 404 || code2 === "NotFound" || code2 === "NoSuchKey") return false;
-          throw e2;
+        } catch (e3: unknown) {
+          if (isNotFoundAwsError(e3)) return false;
+          throw e3;
         }
       }
-
-      // Anything else is likely configuration/permissions.
-      throw e;
     }
   }
 }

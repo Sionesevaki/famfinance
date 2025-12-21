@@ -32,6 +32,12 @@ type CreateUploadUrlParams = {
   type?: DocumentType;
 };
 
+function isRetryableStorageError(err: unknown): boolean {
+  const { httpStatusCode, code } = getAwsErrorInfo(err);
+  if (httpStatusCode && [400, 403, 429, 500, 502, 503, 504].includes(httpStatusCode)) return true;
+  return code === "AccessDenied" || code === "Forbidden" || code === "SlowDown";
+}
+
 @Injectable()
 export class DocumentsService implements OnModuleDestroy {
   private readonly extractionQueue = new Queue("doc_extract", {
@@ -85,13 +91,17 @@ export class DocumentsService implements OnModuleDestroy {
     if (!doc) throw new NotFoundException("Document not found");
 
     let exists = false;
-    const retryDelaysMs = [0, 250, 750];
+    let lastErr: unknown = null;
+    const retryDelaysMs = [0, 350, 900, 1800, 3200];
     for (const d of retryDelaysMs) {
       if (d) await delay(d);
       try {
         exists = await this.s3.objectExists(doc.storageKey);
         if (exists) break;
       } catch (e: unknown) {
+        lastErr = e;
+        if (isRetryableStorageError(e)) continue;
+
         const { code: rawCode, httpStatusCode: httpStatus } = getAwsErrorInfo(e);
         const code = rawCode || "UnknownError";
         const suffix = httpStatus ? ` (HTTP ${httpStatus})` : "";
@@ -99,6 +109,15 @@ export class DocumentsService implements OnModuleDestroy {
           `Storage check failed: ${code}${suffix}. Ensure S3_ENDPOINT points to the same MinIO used for uploads and that S3 credentials allow GetObject/HeadObject for bucket=${requireEnv("S3_BUCKET")} key=${doc.storageKey}.`,
         );
       }
+    }
+
+    if (!exists && lastErr) {
+      const { code: rawCode, httpStatusCode: httpStatus } = getAwsErrorInfo(lastErr);
+      const code = rawCode || "UnknownError";
+      const suffix = httpStatus ? ` (HTTP ${httpStatus})` : "";
+      throw new BadRequestException(
+        `Storage check failed: ${code}${suffix}. This can be caused by Cloudflare/WAF blocking S3-style requests. Ensure your MinIO hostname is DNS-only (not proxied) or bypasses WAF for the S3 API host, and that credentials allow GetObject/HeadObject for bucket=${requireEnv("S3_BUCKET")} key=${doc.storageKey}.`,
+      );
     }
 
     if (!exists) {
