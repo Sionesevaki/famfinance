@@ -105,17 +105,25 @@ export class S3Service {
   }
 
   async objectExists(key: string): Promise<boolean> {
+    const bucket = this.bucket;
     try {
-      await this.internalClient.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      await this.internalClient.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
       return true;
     } catch (e: unknown) {
       const { httpStatusCode: httpStatus, code } = getAwsErrorInfo(e);
 
-      // Some proxies mis-handle HEAD requests; fall back to a minimal ranged GET before concluding "missing".
-      if (httpStatus === 404 || code === "NotFound" || code === "NoSuchKey") {
+      // Some proxies mis-handle HEAD requests (403/404). Fall back to a minimal ranged GET.
+      if (
+        httpStatus === 404 ||
+        httpStatus === 403 ||
+        code === "NotFound" ||
+        code === "NoSuchKey" ||
+        code === "Forbidden" ||
+        code === "AccessDenied"
+      ) {
         try {
           const res = await this.internalClient.send(
-            new GetObjectCommand({ Bucket: this.bucket, Key: key, Range: "bytes=0-0" }),
+            new GetObjectCommand({ Bucket: bucket, Key: key, Range: "bytes=0-0" }),
           );
           destroyBodyIfPossible((res as { Body?: unknown }).Body);
           return true;

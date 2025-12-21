@@ -212,10 +212,12 @@ BASE_URL=https://api.yourdomain.com OWNER_TOKEN="..." ./scripts/smoke/api-smoke.
   - The browser upload didn’t actually reach MinIO (CORS/DNS/TLS/proxy), even though the frontend proceeded.
   - `S3_ENDPOINT` points to a different MinIO than the one used to generate the presigned URL (`S3_PRESIGN_ENDPOINT`).
   - The MinIO user policy allows `PutObject` but not `HeadObject/GetObject` (server-side check fails).
+  - Cloudflare proxy/WAF is in front of your MinIO S3 API domain and returns non-S3 403 responses (AWS SDK reports `Unknown (HTTP 403)`).
 - Fix:
   - Confirm the `uploadUrl` host matches your MinIO domain and that the object exists in the bucket.
   - Ensure `S3_ENDPOINT` and `S3_PRESIGN_ENDPOINT` point to the same MinIO (or set only `S3_ENDPOINT`).
   - Ensure the credentials have `s3:GetObject` permission (required for HEAD/GET).
+  - If using Cloudflare, set the MinIO S3 API DNS record to **DNS only** (no proxy / grey cloud) or fully bypass WAF/caching for that hostname.
 
 ### `self-signed certificate` when calling S3/MinIO
 

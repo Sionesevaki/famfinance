@@ -8,6 +8,32 @@ import { createSubscriptionDetectWorker } from "./workers/subscription-detect.wo
 import { createEmailSyncWorker } from "./workers/email-sync.worker";
 import { createEmailParseWorker } from "./workers/email-parse.worker";
 
+type WorkerLike = {
+  on: (event: string, listener: (...args: unknown[]) => void) => void;
+};
+
+function getJobId(job: unknown): string {
+  if (!job || typeof job !== "object") return "unknown";
+  const rec = job as Record<string, unknown>;
+  const id = rec.id;
+  return typeof id === "string" ? id : "unknown";
+}
+
+function attachWorkerLogs(queue: string, worker: WorkerLike) {
+  worker.on("active", (job: unknown) => {
+    console.log(`[${queue}] started job ${getJobId(job)}`);
+  });
+  worker.on("completed", (job: unknown) => {
+    console.log(`[${queue}] completed job ${getJobId(job)}`);
+  });
+  worker.on("failed", (job: unknown, err: unknown) => {
+    console.error(`[${queue}] failed job ${getJobId(job)}:`, err);
+  });
+  worker.on("error", (err: unknown) => {
+    console.error(`[${queue}] worker error:`, err);
+  });
+}
+
 async function main() {
   const prisma = createWorkerPrismaClient();
   await prisma.$connect();
@@ -21,54 +47,13 @@ async function main() {
   const rollupMonthlyWorker = createRollupMonthlyWorker({ prisma });
   const subscriptionDetectWorker = createSubscriptionDetectWorker({ prisma });
 
-  emailSyncWorker.on("completed", (job) => {
-    console.log(`[email_sync] completed job ${job.id}`);
-  });
-  emailSyncWorker.on("failed", (job, err) => {
-    console.error(`[email_sync] failed job ${job?.id}:`, err);
-  });
-
-  emailParseWorker.on("completed", (job) => {
-    console.log(`[email_parse] completed job ${job.id}`);
-  });
-  emailParseWorker.on("failed", (job, err) => {
-    console.error(`[email_parse] failed job ${job?.id}:`, err);
-  });
-
-  docExtractWorker.on("completed", (job) => {
-    console.log(`[doc_extract] completed job ${job.id}`);
-  });
-  docExtractWorker.on("failed", (job, err) => {
-    console.error(`[doc_extract] failed job ${job?.id}:`, err);
-  });
-
-  normalizeWorker.on("completed", (job) => {
-    console.log(`[normalize] completed job ${job.id}`);
-  });
-  normalizeWorker.on("failed", (job, err) => {
-    console.error(`[normalize] failed job ${job?.id}:`, err);
-  });
-
-  txUpsertWorker.on("completed", (job) => {
-    console.log(`[tx_upsert] completed job ${job.id}`);
-  });
-  txUpsertWorker.on("failed", (job, err) => {
-    console.error(`[tx_upsert] failed job ${job?.id}:`, err);
-  });
-
-  rollupMonthlyWorker.on("completed", (job) => {
-    console.log(`[rollup_monthly] completed job ${job.id}`);
-  });
-  rollupMonthlyWorker.on("failed", (job, err) => {
-    console.error(`[rollup_monthly] failed job ${job?.id}:`, err);
-  });
-
-  subscriptionDetectWorker.on("completed", (job) => {
-    console.log(`[subscription_detect] completed job ${job.id}`);
-  });
-  subscriptionDetectWorker.on("failed", (job, err) => {
-    console.error(`[subscription_detect] failed job ${job?.id}:`, err);
-  });
+  attachWorkerLogs("email_sync", emailSyncWorker);
+  attachWorkerLogs("email_parse", emailParseWorker);
+  attachWorkerLogs("doc_extract", docExtractWorker);
+  attachWorkerLogs("normalize", normalizeWorker);
+  attachWorkerLogs("tx_upsert", txUpsertWorker);
+  attachWorkerLogs("rollup_monthly", rollupMonthlyWorker);
+  attachWorkerLogs("subscription_detect", subscriptionDetectWorker);
 
   console.log(
     "worker started (queues: email_sync, email_parse, doc_extract, normalize, tx_upsert, rollup_monthly, subscription_detect)",

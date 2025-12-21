@@ -96,7 +96,7 @@ export class DocumentsService implements OnModuleDestroy {
         const code = rawCode || "UnknownError";
         const suffix = httpStatus ? ` (HTTP ${httpStatus})` : "";
         throw new BadRequestException(
-          `Storage check failed: ${code}${suffix}. Ensure S3_ENDPOINT points to the same MinIO used for uploads and that S3 credentials allow HeadObject/GetObject.`,
+          `Storage check failed: ${code}${suffix}. Ensure S3_ENDPOINT points to the same MinIO used for uploads and that S3 credentials allow GetObject/HeadObject for bucket=${requireEnv("S3_BUCKET")} key=${doc.storageKey}.`,
         );
       }
     }

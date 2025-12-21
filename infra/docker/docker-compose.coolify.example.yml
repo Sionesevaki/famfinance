@@ -32,18 +32,6 @@ services:
   redis:
     image: redis:7
 
-  minio:
-    image: minio/minio:latest
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - minio_data:/data
-    expose:
-      - "9000"
-      - "9001"
-
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     command:
@@ -106,8 +94,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      minio:
-        condition: service_started
       keycloak:
         condition: service_started
     expose:
@@ -131,10 +117,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      minio:
-        condition: service_started
 
 volumes:
   postgres_data:
   keycloak_postgres_data:
-  minio_data:
