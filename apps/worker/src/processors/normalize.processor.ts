@@ -42,7 +42,7 @@ function looksLikeSummaryLine(line: string): boolean {
 
 function parseDateFromLine(line: string): { occurredAt: Date; matched: string } | null {
   // 2025-12-21 or 2025/12/21
-  const iso = line.match(/\b(20\d{2})[\/.-](\d{2})[\/.-](\d{2})\b/);
+  const iso = line.match(/\b(20\d{2})[/.-](\d{2})[/.-](\d{2})\b/);
   if (iso) {
     const [, y, m, d] = iso;
     const occurredAt = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
@@ -50,7 +50,7 @@ function parseDateFromLine(line: string): { occurredAt: Date; matched: string } 
   }
 
   // 21/12/2025 or 21-12-2025 or 21.12.2025
-  const dmy = line.match(/\b(\d{2})[\/.-](\d{2})[\/.-](20\d{2})\b/);
+  const dmy = line.match(/\b(\d{2})[/.-](\d{2})[/.-](20\d{2})\b/);
   if (dmy) {
     const [, d, m, y] = dmy;
     const occurredAt = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
@@ -58,7 +58,7 @@ function parseDateFromLine(line: string): { occurredAt: Date; matched: string } 
   }
 
   // 21/12/25 -> 2025
-  const dmy2 = line.match(/\b(\d{2})[\/.-](\d{2})[\/.-](\d{2})\b/);
+  const dmy2 = line.match(/\b(\d{2})[/.-](\d{2})[/.-](\d{2})\b/);
   if (dmy2) {
     const [, d, m, y2] = dmy2;
     const year = 2000 + Number(y2);
