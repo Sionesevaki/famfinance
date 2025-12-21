@@ -7,29 +7,31 @@ import { createRollupMonthlyWorker } from "./workers/rollup-monthly.worker";
 import { createSubscriptionDetectWorker } from "./workers/subscription-detect.worker";
 import { createEmailSyncWorker } from "./workers/email-sync.worker";
 import { createEmailParseWorker } from "./workers/email-parse.worker";
+import type { Worker } from "bullmq";
 
-type WorkerLike = {
-  on: (event: string, listener: (...args: unknown[]) => void) => void;
-};
+type JobLike = { id?: string | number };
 
-function getJobId(job: unknown): string {
-  if (!job || typeof job !== "object") return "unknown";
-  const rec = job as Record<string, unknown>;
-  const id = rec.id;
-  return typeof id === "string" ? id : "unknown";
+function getJobId(job: JobLike | undefined | null): string {
+  const id = job?.id;
+  if (typeof id === "string") return id;
+  if (typeof id === "number") return String(id);
+  return "unknown";
 }
 
-function attachWorkerLogs(queue: string, worker: WorkerLike) {
-  worker.on("active", (job: unknown) => {
+function attachWorkerLogs<DataType, ResultType, NameType extends string>(
+  queue: string,
+  worker: Worker<DataType, ResultType, NameType>,
+) {
+  worker.on("active", (job) => {
     console.log(`[${queue}] started job ${getJobId(job)}`);
   });
-  worker.on("completed", (job: unknown) => {
+  worker.on("completed", (job) => {
     console.log(`[${queue}] completed job ${getJobId(job)}`);
   });
-  worker.on("failed", (job: unknown, err: unknown) => {
+  worker.on("failed", (job, err) => {
     console.error(`[${queue}] failed job ${getJobId(job)}:`, err);
   });
-  worker.on("error", (err: unknown) => {
+  worker.on("error", (err) => {
     console.error(`[${queue}] worker error:`, err);
   });
 }

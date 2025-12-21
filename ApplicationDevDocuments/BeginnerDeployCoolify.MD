@@ -231,6 +231,26 @@ BASE_URL=https://api.yourdomain.com OWNER_TOKEN="..." ./scripts/smoke/api-smoke.
   - In MinIO, create/confirm an access key + secret key pair.
   - Set `S3_ACCESS_KEY` + `S3_SECRET_KEY` in Coolify for the API and worker services and redeploy.
 
+### Document extraction never starts (no worker activity)
+
+Symptoms:
+
+- Upload succeeds and `POST /.../documents/:id/complete` returns `200`
+- Document extraction stays `PENDING` / never changes
+- Worker logs show only the startup line and no `[doc_extract] started job ...`
+
+Most common causes:
+
+- `REDIS_URL` differs between `api` and `worker` in Coolify (each service can have its own env vars)
+- `worker` is not running / crashing / restarting
+- `worker` points at the wrong `DATABASE_URL` (updates won’t be visible in the app)
+
+Fix / checks:
+
+- Ensure `REDIS_URL` is identical for `api` and `worker`
+- Ensure `DATABASE_URL` is identical for `api` and `worker`
+- Upload a document again and watch worker logs for `[doc_extract] started job ...`
+
 ### Keycloak realm didn’t import
 
 - Ensure `infra/docker/keycloak/realm-export.json` is present in the repo and the compose volume mount points to it.
